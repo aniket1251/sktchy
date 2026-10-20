@@ -4,22 +4,255 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Infinite Canvas</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Caveat:wght@700&family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
     <style>
+      :root {
+        --surface: #ffffff;
+        --active-tint: #f4f4f5;
+        --text-primary: #000000;
+        --text-secondary: #71717a;
+        --text-muted: #a1a1aa;
+        --border: #ececec;
+        --shadow: rgba(0, 0, 0, 0.06);
+        --radius-lg: 16px;
+        --radius-md: 12px;
+        --radius-sm: 8px;
+        --font-ui: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+
+        /* Canvas-rendered colors (read by render.js) */
+        --canvas-bg: #ffffff;
+        --dot-grid: #d4d4d8;
+        --shape-stroke: #000000;
+        --sel-blue: #3b82f6;
+        --sel-blue-fill: rgba(59, 130, 246, 0.1);
+        --handle-fill: #ffffff;
+      }
+
+      [data-theme="dark"] {
+        --surface: #1c1f26;
+        --active-tint: #2a2e37;
+        --text-primary: #ecedef;
+        --text-secondary: #9ca3b0;
+        --text-muted: #6b7280;
+        --border: #2e323c;
+        --shadow: rgba(0, 0, 0, 0.4);
+
+        --canvas-bg: #0f1115;
+        --dot-grid: #2a2e37;
+        --shape-stroke: #c8cbd2;
+        --sel-blue: #5b9bf5;
+        --sel-blue-fill: rgba(91, 155, 245, 0.14);
+        --handle-fill: #1c1f26;
+      }
+
       html,
       body {
         margin: 0;
         height: 100%;
         overflow: hidden;
+        font-family: var(--font-ui);
+        background: var(--canvas-bg);
       }
       #canvas {
         display: block;
         width: 100vw;
         height: 100vh;
       }
+
+      /* App title (top-left) - Caveat script wordmark */
+      #app-title {
+        position: fixed;
+        top: 22px;
+        left: 32px;
+        display: flex;
+        align-items: center;
+        user-select: none;
+      }
+      #app-title .name {
+        font-family: "Caveat", cursive;
+        font-size: 34px;
+        font-weight: 700;
+        line-height: 1;
+        color: var(--text-primary);
+      }
+
+      /* Toolbar (top-center) */
+      #toolbar {
+        position: fixed;
+        top: 28px;
+        left: 50%;
+        transform: translateX(-50%);
+        display: flex;
+        align-items: center;
+        gap: 2px;
+        padding: 6px;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-lg);
+        box-shadow: 0 2px 8px var(--shadow);
+      }
+      #toolbar button {
+        width: 40px;
+        height: 40px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border: none;
+        background: transparent;
+        border-radius: var(--radius-sm);
+        color: var(--text-secondary);
+        cursor: pointer;
+      }
+      #toolbar button:hover {
+        background: var(--active-tint);
+        color: var(--text-primary);
+      }
+      #toolbar button.active {
+        background: var(--active-tint);
+        color: var(--text-primary);
+      }
+      #toolbar .divider {
+        width: 1px;
+        height: 24px;
+        margin: 0 4px;
+        background: var(--border);
+      }
+      #toolbar svg {
+        width: 20px;
+        height: 20px;
+      }
+
+      /* Contextual hint line (beneath toolbar) - text with key pills */
+      #hint-line {
+        position: fixed;
+        top: 96px;
+        left: 50%;
+        transform: translateX(-50%);
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: center;
+        gap: 5px;
+        max-width: min(520px, calc(100vw - 48px));
+        text-align: center;
+        font-size: 12px;
+        color: var(--text-muted);
+        user-select: none;
+        pointer-events: none;
+      }
+
+      /* Zoom indicator (bottom-right) */
+      #zoom-indicator {
+        position: fixed;
+        bottom: 28px;
+        right: 32px;
+        display: flex;
+        align-items: center;
+        gap: 2px;
+        padding: 8px 10px;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-md);
+        box-shadow: 0 2px 8px var(--shadow);
+        user-select: none;
+      }
+      #zoom-indicator button {
+        width: 28px;
+        height: 28px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border: none;
+        background: transparent;
+        border-radius: 6px;
+        color: var(--text-secondary);
+        cursor: pointer;
+      }
+      #zoom-indicator button:hover {
+        background: var(--active-tint);
+        color: var(--text-primary);
+      }
+      #zoom-indicator svg {
+        width: 16px;
+        height: 16px;
+      }
+      #zoom-label {
+        min-width: 52px;
+        text-align: center;
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--text-primary);
+      }
+
+      /* Theme toggle icon: gentle rotate/scale pop on each switch */
+      #theme-toggle svg {
+        animation: theme-icon-pop 600ms cubic-bezier(0.34, 1.56, 0.64, 1);
+      }
+      @keyframes theme-icon-pop {
+        0% {
+          transform: rotate(-90deg) scale(0.4);
+          opacity: 0;
+        }
+        100% {
+          transform: rotate(0deg) scale(1);
+          opacity: 1;
+        }
+      }
+
+      /* View Transition: new snapshot clips to an expanding circle so the theme wipes over the old one. */
+      ::view-transition-old(root),
+      ::view-transition-new(root) {
+        animation: none;
+        mix-blend-mode: normal;
+      }
+      ::view-transition-old(root) {
+        z-index: 1;
+      }
+      ::view-transition-new(root) {
+        z-index: 2;
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        #theme-toggle svg {
+          animation: none;
+        }
+      }
     </style>
   </head>
   <body>
     <canvas id="canvas"></canvas>
+
+    <div id="app-title">
+      <div class="name">Sktchy</div>
+    </div>
+
+    <div id="toolbar">
+      <button data-tool="hand" title="Hand (pan)"><i data-lucide="hand"></i></button>
+      <button data-tool="select" title="Select"><i data-lucide="mouse-pointer-2"></i></button>
+      <button data-tool="rect" title="Rectangle"><i data-lucide="square"></i></button>
+      <button data-tool="ellipse" title="Ellipse"><i data-lucide="circle"></i></button>
+      <span class="divider"></span>
+      <button data-action="undo" title="Undo"><i data-lucide="undo-2"></i></button>
+      <button data-action="redo" title="Redo"><i data-lucide="redo-2"></i></button>
+      <button data-action="delete" title="Delete"><i data-lucide="trash-2"></i></button>
+      <span class="divider"></span>
+      <button id="theme-toggle" title="Toggle theme"><i data-lucide="moon"></i></button>
+    </div>
+
+    <div id="hint-line"></div>
+
+    <div id="zoom-indicator">
+      <button id="zoom-out" title="Zoom out"><i data-lucide="minus"></i></button>
+      <span id="zoom-label">100%</span>
+      <button id="zoom-in" title="Zoom in"><i data-lucide="plus"></i></button>
+    </div>
+
+    <script src="https://unpkg.com/lucide@latest"></script>
     <script type="module" src="/src/main.js"></script>
   </body>
 </html>
