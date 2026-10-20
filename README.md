@@ -14,6 +14,15 @@ them, with full undo/redo and crisp rendering on HiDPI displays.
 - [Node.js](https://nodejs.org/) 18 or newer (required by Vite 5)
 - npm (bundled with Node.js)
 
+### Clone the repository
+
+```bash
+git clone https://github.com/aniket1251/sktchy.git
+cd sktchy
+```
+
+If you received the project as a zip instead, unzip it and `cd` into the extracted folder.
+
 ### Install dependencies
 
 ```bash
