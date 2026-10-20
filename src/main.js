@@ -101,6 +101,12 @@ function switchTheme(theme) {
 }
 
 function initTheme() {
+  // The blocking inline script in index.html already resolved and applied the
+  // theme before first paint; mirror it here so there's a single source of truth.
+  const preApplied = document.documentElement.getAttribute("data-theme");
+  if (preApplied === "dark" || preApplied === "light") {
+    return preApplied;
+  }
   let theme = "light";
   try {
     const saved = localStorage.getItem(THEME_KEY);
