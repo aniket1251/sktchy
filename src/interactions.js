@@ -3,6 +3,7 @@
 
 import {
   createNode,
+  createLine,
   normalizeRect,
   hitTest,
   hitTestCycle,
@@ -13,7 +14,12 @@ import {
   removeSelected,
   unionBounds,
 } from "./scene.js";
-import { handleCenters, HANDLE_SCREEN } from "./render.js";
+import {
+  handleCenters,
+  HANDLE_SCREEN,
+  hitConnectionPoint,
+  connectionPoints,
+} from "./render.js";
 
 const DRAW_MIN = 2; // min node size (world units) for a draw to create a shape
 const KEY_ZOOM_STEP = 0.1; // scale change per Ctrl/Cmd +/- press
@@ -39,6 +45,8 @@ export function attachInteractions({
   let groupAnchor = null;
   let groupResizeData = null;
   let lastPointer = null;
+  // First endpoint of a line in progress: { node, x, y } in world space, or null.
+  let pendingConnect = null;
 
   function setCursor(value) {
     canvas.style.cursor = value;
@@ -144,6 +152,40 @@ export function attachInteractions({
     const world = camera.screenToWorld(e.clientX, e.clientY);
 
     const tool = getActiveTool();
+
+    // Connection points take priority: click one on a box, then one on a
+    // different box, to join them with a line that follows both boxes.
+    if (tool === "select") {
+      for (let i = scene.nodes.length - 1; i >= 0; i--) {
+        const n = scene.nodes[i];
+        const anchor = hitConnectionPoint(n, e.clientX, e.clientY, camera);
+        if (anchor === -1) continue;
+
+        if (!pendingConnect) {
+          // First point: remember the box + which anchor, wait for the second.
+          pendingConnect = { node: n, anchor };
+          requestRender();
+        } else if (pendingConnect.node !== n) {
+          // Second point on a different box: join by reference.
+          const line = createLine(
+            pendingConnect.node.id,
+            pendingConnect.anchor,
+            n.id,
+            anchor
+          );
+          scene.nodes.push(line);
+          history.commit(scene);
+          pendingConnect = null;
+          requestRender();
+          syncChrome();
+        } else {
+          // Same box clicked again: move the pending anchor to this one.
+          pendingConnect = { node: n, anchor };
+          requestRender();
+        }
+        return;
+      }
+    }
 
     if (tool === "select") {
       const sel = getSelected(scene);
@@ -394,7 +436,12 @@ export function attachInteractions({
   );
 
   function getOverlay() {
-    return { draftNode, marqueeRect };
+    let pendingPt = null;
+    if (pendingConnect) {
+      // Highlight sits on the drawn dot (gap-offset), matching connectionPoints.
+      pendingPt = connectionPoints(pendingConnect.node, camera.scale)[pendingConnect.anchor];
+    }
+    return { draftNode, marqueeRect, pendingConnect: pendingPt };
   }
 
   setCursor("default");
